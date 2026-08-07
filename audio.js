@@ -7,7 +7,7 @@ export class CoinpushAudio {
     /** @type {AudioContext | null} */
     this.ctx = null;
     this.enabled = true;
-    this.master = 0.2;
+    this.master = 0.24;
     this._clinkGate = 0;
     this._pushGate = 0;
   }
@@ -60,8 +60,8 @@ export class CoinpushAudio {
   }
 
   drop() {
-    this.tone(280, 0.05, "sine", 0.07);
-    this.tone(180, 0.08, "triangle", 0.05, 0.04);
+    this.tone(280, 0.06, "sine", 0.09);
+    this.tone(180, 0.09, "triangle", 0.06, 0.04);
   }
 
   land() {

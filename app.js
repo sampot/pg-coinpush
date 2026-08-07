@@ -124,5 +124,13 @@ canvas.addEventListener("pointerdown", async (ev) => {
   syncHud();
 });
 
+document.body.addEventListener(
+  "pointerdown",
+  () => {
+    void audio.unlock();
+  },
+  { once: true },
+);
+
 syncHud();
 requestAnimationFrame(frame);
