@@ -12,6 +12,7 @@ const scoreEl = document.getElementById("score");
 const creditsEl = document.getElementById("credits");
 const statusEl = document.getElementById("status");
 const btnMute = document.getElementById("btn-mute");
+const btnCredit = document.getElementById("btn-credit");
 const btnStart = document.getElementById("btn-start");
 const btnReset = document.getElementById("btn-reset");
 
@@ -39,9 +40,12 @@ function syncHud() {
   if (game.status === "ready") {
     btnStart.textContent = "開台";
     btnStart.disabled = false;
-  } else if (game.status === "playing" && game.credits > 0) {
+  } else if (game.status === "playing") {
     btnStart.textContent = "推幣中";
     btnStart.disabled = true;
+  } else if (game.status === "empty") {
+    btnStart.textContent = "再開一局";
+    btnStart.disabled = false;
   } else {
     btnStart.textContent = "再開一局";
     btnStart.disabled = false;
@@ -96,6 +100,14 @@ btnReset.addEventListener("click", async () => {
   await audio.unlock();
   game.reset();
   syncHud();
+});
+
+btnCredit.addEventListener("click", async () => {
+  await audio.unlock();
+  if (game.addCredits()) {
+    audio.coin();
+    syncHud();
+  }
 });
 
 btnMute.addEventListener("click", async () => {

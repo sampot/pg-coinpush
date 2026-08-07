@@ -59,6 +59,12 @@ export class CoinpushAudio {
     this.tone(523, 0.1, "triangle", 0.08, 0.06);
   }
 
+  /** Entertainment credit top-up */
+  coin() {
+    this.tone(880, 0.06, "square", 0.12);
+    this.tone(1320, 0.08, "square", 0.09, 0.05);
+  }
+
   drop() {
     this.tone(280, 0.06, "sine", 0.09);
     this.tone(180, 0.09, "triangle", 0.06, 0.04);

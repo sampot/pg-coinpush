@@ -20,6 +20,7 @@ export const WALL_REST = 0.35;
 export const COIN_REST = 0.28;
 export const FIXED_DT = 1 / 120;
 export const START_CREDITS = 20;
+export const CREDIT_TOP_UP = 20;
 export const POINTS_PER_COIN = 10;
 export const MAX_COINS = 90;
 
@@ -124,6 +125,21 @@ export class CoinpushGame {
   }
 
   /**
+   * Unlimited entertainment top-up (pure fun credits).
+   * @param {number} [n]
+   */
+  addCredits(n = CREDIT_TOP_UP) {
+    if (n <= 0) return false;
+    this.credits += n;
+    if (this.status === "empty") this.status = "playing";
+    this.message =
+      this.status === "ready"
+        ? `已加 ${n} 枚 · 開台後可投`
+        : `續幣 +${n} · 現有 ${this.credits} 枚`;
+    return true;
+  }
+
+  /**
    * Spend one credit and drop a coin at aimX.
    */
   drop() {
@@ -136,7 +152,7 @@ export class CoinpushGame {
     }
     if (this.credits <= 0) {
       this.status = "empty";
-      this.message = `代幣用盡 · 總分 ${this.score} · 可重來`;
+      this.message = `代幣用盡 · 總分 ${this.score} · 可續幣`;
       events.push("deny");
       events.push("empty");
       return { ok: false, events };
@@ -202,9 +218,10 @@ export class CoinpushGame {
         !anyFalling &&
         !moving &&
         this.message.indexOf("代幣用盡") < 0 &&
-        this.message.indexOf("重來") < 0
+        this.message.indexOf("續幣") < 0
       ) {
-        this.message = `代幣用盡 · 總分 ${this.score} · 點重來再玩`;
+        this.status = "empty";
+        this.message = `代幣用盡 · 總分 ${this.score} · 點「+20 幣」續投`;
       }
     }
 
