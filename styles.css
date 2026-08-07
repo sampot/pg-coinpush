@@ -1,0 +1,203 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f7f0e8;
+  --panel: #ffffff;
+  --text: #1a1410;
+  --muted: #6b5e52;
+  --line: #e4d8cb;
+  --accent: #c2410c;
+  --accent-dim: #9a3412;
+  --on-accent: #ffffff;
+  --accent-soft: color-mix(in oklab, var(--accent) 14%, var(--panel));
+  --neon: #fbbf24;
+  --danger: #b91c1c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c0908;
+    --panel: #1a1410;
+    --text: #f3ebe3;
+    --muted: #a8998a;
+    --line: #3a2e24;
+    --accent: #fb923c;
+    --accent-dim: #ea580c;
+    --on-accent: #1a0a00;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family:
+    "Avenir Next",
+    "Segoe UI",
+    "PingFang TC",
+    "Noto Sans TC",
+    sans-serif;
+  background:
+    radial-gradient(
+      900px 480px at 75% -8%,
+      color-mix(in oklab, var(--accent) 20%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      700px 400px at 8% 100%,
+      color-mix(in oklab, #fbbf24 14%, transparent),
+      transparent 50%
+    ),
+    var(--bg);
+  color: var(--text);
+}
+
+main {
+  width: min(100%, 28rem);
+  margin: 0 auto;
+  padding: 1.1rem 1rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.hero h1 {
+  margin: 0;
+  font-family:
+    "Iowan Old Style",
+    Palatino,
+    "Songti TC",
+    serif;
+  font-size: clamp(1.75rem, 4vw, 2.2rem);
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+.tagline {
+  margin: 0.3rem 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.meter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1.1rem;
+  padding: 0.75rem 0.9rem;
+  background: color-mix(in oklab, var(--panel) 92%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+}
+
+.meter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.meter-item .label {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.meter-item strong {
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.meter-actions {
+  margin-left: auto;
+}
+
+.stage {
+  display: flex;
+  justify-content: center;
+}
+
+#game {
+  display: block;
+  width: min(100%, 420px);
+  height: auto;
+  aspect-ratio: 420 / 640;
+  border-radius: 0.75rem;
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--accent) 40%, #000),
+    0 14px 36px rgba(0, 0, 0, 0.28);
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+}
+
+.status {
+  margin: 0;
+  text-align: center;
+  font-weight: 650;
+  padding: 0.65rem 0.85rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  min-height: 2.6rem;
+}
+
+.status[data-tone="win"] {
+  background: color-mix(in oklab, var(--neon) 22%, var(--panel));
+}
+
+.status[data-tone="warn"] {
+  background: color-mix(in oklab, #f59e0b 18%, var(--panel));
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.controls button {
+  flex: 1;
+  min-height: 2.75rem;
+}
+
+button {
+  font: inherit;
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: 0.55rem;
+  padding: 0.55rem 0.9rem;
+  font-weight: 650;
+  cursor: pointer;
+  min-height: 2.75rem;
+}
+
+button.secondary {
+  background: var(--accent-soft);
+  color: var(--text);
+  border-color: var(--line);
+}
+
+button:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+@media (min-width: 480px) {
+  main {
+    padding: 1.4rem 1.25rem 2.5rem;
+  }
+}

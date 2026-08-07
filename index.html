@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="推幣機：投幣、推板、掉落得分。純前端 Playgrounds SAM，致敬推幣機玩法類型，純娛樂計分。"
+    />
+    <title>推幣機</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <h1>推幣機</h1>
+        <p class="tagline">投幣 · 推板 · 掉落 · 純娛樂</p>
+      </header>
+
+      <section class="meter" aria-label="分數">
+        <div class="meter-item">
+          <span class="label">分數</span>
+          <strong id="score">0</strong>
+        </div>
+        <div class="meter-item">
+          <span class="label">代幣</span>
+          <strong id="credits">20</strong>
+        </div>
+        <div class="meter-actions">
+          <button type="button" id="btn-mute" class="secondary" aria-pressed="true">
+            音效開
+          </button>
+        </div>
+      </section>
+
+      <div class="stage">
+        <canvas
+          id="game"
+          width="420"
+          height="640"
+          role="img"
+          aria-label="推幣機機台"
+        ></canvas>
+      </div>
+
+      <p id="status" class="status" role="status">點「開台」開始；點機台選位置投幣</p>
+
+      <div class="controls">
+        <button type="button" id="btn-start">開台</button>
+        <button type="button" id="btn-reset" class="secondary">重來</button>
+      </div>
+
+      <p class="hint">
+        點機台上方選落點投下代幣；推板來回推動，從前方邊緣掉落得分。代幣為純娛樂點數，無關真實金錢或賭博。名稱與盤面為原創小品，致敬「推幣機」玩法類型，非任一商業機台復刻。
+      </p>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
