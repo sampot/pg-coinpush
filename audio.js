@@ -96,6 +96,12 @@ export class CoinpushAudio {
     this.tone(880, 0.08, "sine", 0.06, 0.12);
   }
 
+  /** Swallowed by a side return — dull, no reward chime. */
+  lost() {
+    this.tone(196, 0.07, "triangle", 0.05);
+    this.tone(147, 0.09, "sine", 0.04, 0.05);
+  }
+
   deny() {
     this.tone(160, 0.08, "square", 0.05);
     this.tone(110, 0.1, "triangle", 0.04, 0.05);

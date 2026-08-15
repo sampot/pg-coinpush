@@ -3,6 +3,8 @@ import {
   FIELD_RIGHT,
   FRONT_EDGE,
   H,
+  PAYOUT_LEFT,
+  PAYOUT_RIGHT,
   SHELF_TOP,
   W,
 } from "./game.js";
@@ -97,22 +99,39 @@ export function drawScene(ctx, game) {
   ctx.fillStyle = "rgba(251, 191, 36, 0.35)";
   ctx.fillRect(p.x + 2, p.y + p.h - 5, p.w - 4, 5);
 
-  // front drop edge
-  ctx.fillStyle = "rgba(127, 29, 29, 0.55)";
-  ctx.fillRect(FIELD_LEFT - 2, FRONT_EDGE, FIELD_RIGHT - FIELD_LEFT + 4, 18);
-  ctx.fillStyle = "rgba(252, 165, 165, 0.75)";
-  ctx.font = "600 11px system-ui, sans-serif";
-  ctx.fillText("▼ 掉落得分 ▼", (FIELD_LEFT + FIELD_RIGHT) / 2, FRONT_EDGE + 10);
+  // front ledge: center payout chute flanked by side returns
+  ctx.fillStyle = "rgba(87, 83, 78, 0.75)";
+  ctx.fillRect(FIELD_LEFT - 2, FRONT_EDGE, FIELD_RIGHT - FIELD_LEFT + 4, 20);
+  ctx.fillStyle = "rgba(253, 224, 71, 0.3)";
+  ctx.fillRect(PAYOUT_LEFT, FRONT_EDGE, PAYOUT_RIGHT - PAYOUT_LEFT, 20);
+  ctx.strokeStyle = "rgba(253, 224, 71, 0.8)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(PAYOUT_LEFT, FRONT_EDGE);
+  ctx.lineTo(PAYOUT_LEFT, FRONT_EDGE + 20);
+  ctx.moveTo(PAYOUT_RIGHT, FRONT_EDGE);
+  ctx.lineTo(PAYOUT_RIGHT, FRONT_EDGE + 20);
+  ctx.stroke();
+  ctx.font = "600 11px system-ui, 'PingFang TC', sans-serif";
+  ctx.fillStyle = "rgba(253, 224, 71, 0.95)";
+  ctx.fillText("▼ 得分口 ▼", (PAYOUT_LEFT + PAYOUT_RIGHT) / 2, FRONT_EDGE + 11);
+  ctx.fillStyle = "rgba(214, 211, 209, 0.7)";
+  ctx.font = "600 10px system-ui, 'PingFang TC', sans-serif";
+  ctx.fillText("邊溝", (FIELD_LEFT + PAYOUT_LEFT) / 2, FRONT_EDGE + 11);
+  ctx.fillText("邊溝", (PAYOUT_RIGHT + FIELD_RIGHT) / 2, FRONT_EDGE + 11);
 
   // tray below
   ctx.fillStyle = "rgba(15, 10, 8, 0.9)";
-  ctx.fillRect(FIELD_LEFT, FRONT_EDGE + 18, FIELD_RIGHT - FIELD_LEFT, H - FRONT_EDGE - 28);
+  ctx.fillRect(FIELD_LEFT, FRONT_EDGE + 20, FIELD_RIGHT - FIELD_LEFT, H - FRONT_EDGE - 30);
   ctx.fillStyle = "rgba(251, 191, 36, 0.15)";
-  roundRect(ctx, FIELD_LEFT + 24, FRONT_EDGE + 36, FIELD_RIGHT - FIELD_LEFT - 48, 52, 10);
+  roundRect(ctx, FIELD_LEFT + 24, FRONT_EDGE + 40, FIELD_RIGHT - FIELD_LEFT - 48, 58, 10);
   ctx.fill();
-  ctx.fillStyle = "rgba(253, 224, 71, 0.55)";
-  ctx.font = "600 12px system-ui, sans-serif";
-  ctx.fillText(`已推出 ${game.pushed} 枚`, (FIELD_LEFT + FIELD_RIGHT) / 2, FRONT_EDGE + 62);
+  ctx.fillStyle = "rgba(253, 224, 71, 0.7)";
+  ctx.font = "700 14px system-ui, 'PingFang TC', sans-serif";
+  ctx.fillText(`已推出 ${game.pushed} 枚`, (FIELD_LEFT + FIELD_RIGHT) / 2, FRONT_EDGE + 60);
+  ctx.fillStyle = "rgba(214, 211, 209, 0.6)";
+  ctx.font = "600 11px system-ui, 'PingFang TC', sans-serif";
+  ctx.fillText(`邊溝漏掉 ${game.lost} 枚`, (FIELD_LEFT + FIELD_RIGHT) / 2, FRONT_EDGE + 82);
 
   // coins (back to front)
   const sorted = game.coins.filter((c) => c.alive).sort((a, b) => a.y - b.y);

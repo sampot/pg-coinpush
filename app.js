@@ -62,6 +62,7 @@ function handleEvents(events) {
     else if (e === "clink") audio.clink();
     else if (e === "push") audio.push();
     else if (e === "score") audio.score();
+    else if (e === "lost") audio.lost();
     else if (e === "deny") audio.deny();
     else if (e === "empty") audio.empty();
   }

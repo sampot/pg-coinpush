@@ -1,32 +1,50 @@
 /**
- * 推幣機 — simplified coin-pusher physics (circles + AABB pusher).
- * Top-ish view: back = pusher, front = drop edge. Not a full engine.
+ * 推幣機 — coin-pusher physics (circles + AABB plate). Not a full engine, but
+ * strictly no free energy: a coin moves only when the plate or another coin
+ * pushes it, contacts are symmetric, and the house edge comes from the ledge
+ * geometry (center payout chute vs side returns) rather than from fudge forces.
+ * Top-ish view: back = plate, front = ledge.
  */
 
 export const W = 420;
 export const H = 640;
-export const COIN_R = 14;
+export const COIN_R = 18;
 export const FIELD_LEFT = 28;
 export const FIELD_RIGHT = W - 28;
 export const SHELF_TOP = 118;
-export const FRONT_EDGE = 528;
+export const FRONT_EDGE = 470;
 export const DROP_Y = 52;
 export const PUSHER_H = 36;
 export const PUSHER_AMP = 42;
 export const PUSHER_PERIOD = 3.2;
 export const GRAVITY = 980;
-/** Keep low so packs can still slide when the plate shoves. */
-export const FRICTION = 1.15;
+/** Coulomb friction of coin on shelf: coins only slide while something pushes. */
+export const FRICTION_MU = 0.34;
 export const WALL_REST = 0.35;
-export const COIN_REST = 0.22;
+export const COIN_REST = 0.18;
 export const FIXED_DT = 1 / 120;
 export const START_CREDITS = 20;
 export const CREDIT_TOP_UP = 20;
 export const POINTS_PER_COIN = 10;
-/** Soft cap — jam-break runs before hard deny. */
-export const MAX_COINS = 72;
-/** Near the lip, coins get a forward tug so packs shed over the edge. */
-export const LIP_ZONE = 56;
+/** Hard cap — the shelf physically holds no more. */
+export const MAX_COINS = 84;
+/** Contact solver iterations per physics step (chain stiffness). */
+export const SOLVER_PASSES = 6;
+/**
+ * Pre-loaded bed. A real cabinet is filled across the full width: the plate
+ * shoves a whole row at once, so every column has its own force chain. A
+ * narrow pile just wedges sideways and never moves the bed.
+ */
+export const SEED_FRONT_GAP = 0;
+export const SEED_BACK_Y = 250;
+/**
+ * Front ledge is split like a real cabinet: a center payout chute that scores,
+ * flanked by side returns that swallow coins. This is the whole house edge —
+ * nothing else stops a coin from reaching the ledge.
+ */
+export const PAYOUT_HALF_W = 92;
+export const PAYOUT_LEFT = (FIELD_LEFT + FIELD_RIGHT) / 2 - PAYOUT_HALF_W;
+export const PAYOUT_RIGHT = (FIELD_LEFT + FIELD_RIGHT) / 2 + PAYOUT_HALF_W;
 
 /**
  * @typedef {object} Coin
@@ -50,6 +68,7 @@ export class CoinpushGame {
     this.score = 0;
     this.credits = START_CREDITS;
     this.pushed = 0;
+    this.lost = 0;
     this.t = 0;
     this.shake = 0;
     this.lastGain = 0;
@@ -61,7 +80,6 @@ export class CoinpushGame {
     this.coins = [];
     this.physAcc = 0;
     this.pusherY = SHELF_TOP;
-    this._fullSince = 0;
     this.seedShelf();
   }
 
@@ -81,35 +99,41 @@ export class CoinpushGame {
     if (this.status === "playing" && this.credits > 0) return false;
     this.score = 0;
     this.pushed = 0;
+    this.lost = 0;
     this.credits = START_CREDITS;
     this.coins = [];
     this.seedShelf();
     this.t = 0;
     this.shake = 0;
     this.physAcc = 0;
-    this._fullSince = 0;
     this.status = "playing";
     this.message = "點機台上方投下代幣 · 純娛樂計分";
     this.lastGain = 0;
     return true;
   }
 
+  /**
+   * Pre-loaded bed, like a freshly filled machine: rows from the plate's reach
+   * out to the ledge, so an inserted coin has to displace what is already there.
+   */
   seedShelf() {
-    const rows = 4;
-    const cols = 7;
-    const y0 = SHELF_TOP + PUSHER_H + PUSHER_AMP + 28;
-    const y1 = FRONT_EDGE - 70;
+    // Hex close packing: neighbours actually touch, so a shove travels instead
+    // of being swallowed by slack.
+    const d = COIN_R * 2;
+    const pitch = d * Math.sin(Math.PI / 3);
+    const usable = FIELD_RIGHT - FIELD_LEFT - d;
+    const cols = Math.floor(usable / d) + 1;
+    const yFront = FRONT_EDGE - COIN_R - SEED_FRONT_GAP;
+    const rows = Math.floor((yFront - SEED_BACK_Y) / pitch) + 1;
     for (let row = 0; row < rows; row++) {
-      const y = y0 + (row / (rows - 1)) * (y1 - y0);
-      const n = cols - (row % 2);
-      const inset = row % 2 === 0 ? 0 : (FIELD_RIGHT - FIELD_LEFT) / cols / 2;
+      const y = yFront - row * pitch;
+      const odd = row % 2 === 1;
+      const n = odd ? cols - 1 : cols;
       for (let c = 0; c < n; c++) {
-        const x =
-          FIELD_LEFT +
-          22 +
-          inset +
-          (c / Math.max(1, n - 1)) * (FIELD_RIGHT - FIELD_LEFT - 44);
-        this.coins.push(this.makeCoin(x + (Math.random() - 0.5) * 4, y, false));
+        const x = FIELD_LEFT + COIN_R + (odd ? COIN_R : 0) + c * d;
+        this.coins.push(
+          this.makeCoin(x + (Math.random() - 0.5) * 0.8, y, false),
+        );
       }
     }
   }
@@ -157,22 +181,6 @@ export class CoinpushGame {
     return true;
   }
 
-  /** True if drop column near aimX has room (not a solid stack). */
-  dropColumnFree() {
-    const band = COIN_R * 1.6;
-    let hits = 0;
-    for (const c of this.coins) {
-      if (!c.alive || c.falling) continue;
-      if (
-        Math.abs(c.x - this.aimX) < band &&
-        c.y < SHELF_TOP + PUSHER_H + PUSHER_AMP + 50
-      ) {
-        hits += 1;
-      }
-    }
-    return hits < 3;
-  }
-
   /**
    * Spend one credit and drop a coin at aimX.
    */
@@ -192,10 +200,8 @@ export class CoinpushGame {
       return { ok: false, events };
     }
     this.pruneDead();
-    const alive = this.aliveCount();
-    if (alive >= MAX_COINS && !this.dropColumnFree()) {
-      this.message = "機台太滿，推板清出中…";
-      this.breakJam(1.6, events);
+    if (this.aliveCount() >= MAX_COINS) {
+      this.message = "盤面滿了 · 等推板推出幾枚再投";
       events.push("deny");
       return { ok: false, events };
     }
@@ -243,17 +249,6 @@ export class CoinpushGame {
     const rect = this.pusherRect();
     this.pusherY = rect.y;
 
-    const alive = this.aliveCount();
-    if (alive >= MAX_COINS * 0.85) {
-      this._fullSince += dt;
-      // Persistent pack: keep shedding toward the lip
-      if (this._fullSince > 0.35) {
-        this.breakJam(0.55 + Math.min(1.2, this._fullSince * 0.25), events);
-      }
-    } else {
-      this._fullSince = 0;
-    }
-
     if (this.status === "playing" && this.credits <= 0) {
       const anyFalling = this.coins.some((c) => c.alive && c.falling);
       const moving = this.coins.some(
@@ -271,38 +266,6 @@ export class CoinpushGame {
     }
 
     return { events: uniqueTail(events, 10) };
-  }
-
-  /**
-   * Forward bias + occasional forced lip drop so packs never permanently jam.
-   * @param {number} strength
-   * @param {string[]} events
-   */
-  breakJam(strength, events) {
-    /** @type {Coin[]} */
-    const shelf = [];
-    for (const c of this.coins) {
-      if (!c.alive || c.falling) continue;
-      shelf.push(c);
-      c.vy += 28 * strength;
-      c.vx += (Math.random() - 0.5) * 12 * strength;
-    }
-    if (!shelf.length) return;
-    shelf.sort((a, b) => b.y - a.y);
-    // Nudge the frontmost coins hardest; force-score if still stuck on the lip
-    const nForce = Math.min(3, Math.max(1, Math.floor(strength)));
-    for (let i = 0; i < nForce; i++) {
-      const c = shelf[i];
-      if (!c) break;
-      c.y += 6 * strength;
-      c.vy = Math.max(c.vy, 90 * strength);
-      if (
-        c.y + c.r * 0.35 >= FRONT_EDGE ||
-        (strength > 1.2 && i === 0 && c.y > FRONT_EDGE - LIP_ZONE)
-      ) {
-        this.scoreCoin(c, events);
-      }
-    }
   }
 
   /**
@@ -336,16 +299,11 @@ export class CoinpushGame {
         continue;
       }
 
-      // Lip gravity: coins near the front edge keep drifting off
-      const lip = FRONT_EDGE - (c.y + c.r);
-      if (lip < LIP_ZONE) {
-        const t = 1 - Math.max(0, lip) / LIP_ZONE;
-        c.vy += (55 + 140 * t * t) * h;
-      }
-
+      // Flat shelf: no forward pull. Only contacts move a coin, and Coulomb
+      // friction brings it back to rest shortly after the push ends.
       const sp = Math.hypot(c.vx, c.vy);
       if (sp > 0.5) {
-        const dec = Math.min(sp, FRICTION * 60 * h);
+        const dec = Math.min(sp, FRICTION_MU * GRAVITY * h);
         c.vx -= (c.vx / sp) * dec;
         c.vy -= (c.vy / sp) * dec;
       } else {
@@ -365,13 +323,29 @@ export class CoinpushGame {
         if (c.vy < 0) c.vy = -c.vy * WALL_REST;
       }
 
-      if (c.y - c.r > FRONT_EDGE) {
-        this.scoreCoin(c, events);
+      // Tips over once its center of mass clears the ledge; only the center
+      // chute pays, the flanks are side returns.
+      if (c.y > FRONT_EDGE) {
+        if (c.x > PAYOUT_LEFT && c.x < PAYOUT_RIGHT) {
+          this.scoreCoin(c, events);
+        } else {
+          this.loseCoin(c, events);
+        }
       }
     }
 
-    for (let pass = 0; pass < 4; pass++) {
+    // Rigid-ish contact chain: iterate plate + coin contacts together, so a
+    // packed shelf transmits the plate's shove all the way to the ledge
+    // instead of losing half of it at every contact.
+    for (let pass = 0; pass < SOLVER_PASSES; pass++) {
       this.resolveCoins(events);
+      for (const c of this.coins) {
+        if (!c.alive || c.falling) continue;
+        this.resolvePusher(c, pusher, pusherVy, events);
+        this.clampX(c);
+        const back = SHELF_TOP + c.r;
+        if (c.y < back) c.y = back;
+      }
     }
 
     // Sweep scored coins so aliveCount stays honest
@@ -405,104 +379,80 @@ export class CoinpushGame {
     const dx = c.x - nearestX;
     const dy = c.y - nearestY;
     const dist = Math.hypot(dx, dy);
-    if (dist >= c.r || dist < 1e-6) {
-      if (c.x > p.x && c.x < p.x + p.w && c.y > p.y && c.y < p.y + p.h) {
-        c.y = p.y + p.h + c.r + 0.5;
-        c.vy = Math.max(c.vy, Math.max(55, pusherVy * 1.4 + 35));
-        events.push("push");
-      }
+
+    // Swept over by the plate: eject to the front face, at plate speed.
+    if (dist < 1e-6) {
+      c.y = p.y + p.h + c.r;
+      if (pusherVy > 0) c.vy = Math.max(c.vy, pusherVy);
+      events.push("push");
       return;
     }
+    if (dist >= c.r) return;
 
     const nx = dx / dist;
     const ny = dy / dist;
-    const overlap = c.r - dist;
-    c.x += nx * overlap;
-    c.y += ny * overlap;
+    c.x += nx * (c.r - dist);
+    c.y += ny * (c.r - dist);
 
-    // Advancing plate: shove hard toward the front (+y)
-    if (pusherVy > 6 && (ny > 0.05 || c.y >= p.y + p.h - 2)) {
-      c.vy = Math.max(c.vy, pusherVy * 1.35 + 45);
-      c.vx += nx * 40;
-      c.y += Math.max(0, overlap * 0.35);
-      if (overlap > 0.6) events.push("push");
-    } else {
-      const vn = c.vx * nx + c.vy * ny;
-      if (vn < 0) {
-        c.vx -= vn * nx * (1 + WALL_REST);
-        c.vy -= vn * ny * (1 + WALL_REST);
-      }
+    // A rigid plate can impart its own surface speed and no more; when it
+    // retracts it lets go instead of dragging coins back.
+    const vn = c.vx * nx + c.vy * ny;
+    const plateVn = pusherVy * ny;
+    if (vn < plateVn) {
+      const dv = plateVn - vn;
+      c.vx += dv * nx;
+      c.vy += dv * ny;
+      if (dv > 12) events.push("push");
     }
   }
 
   /**
+   * One Gauss-Seidel sweep over coin contacts, ordered back to front so a push
+   * propagates along the chain in the direction it travels.
    * @param {string[]} events
    */
   resolveCoins(events) {
-    const list = this.coins;
+    const list = [];
+    for (const c of this.coins) {
+      if (c.alive && !c.falling) list.push(c);
+    }
+    list.sort((a, b) => a.y - b.y);
     const n = list.length;
     for (let i = 0; i < n; i++) {
       const a = list[i];
-      if (!a.alive || a.falling) continue;
       for (let j = i + 1; j < n; j++) {
         const b = list[j];
-        if (!b.alive || b.falling) continue;
+        // Sorted by y: once the gap exceeds a diameter, nothing further touches.
+        if (b.y - a.y >= a.r + b.r) break;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const dist = Math.hypot(dx, dy);
         const min = a.r + b.r;
-        if (dist >= min || dist < 1e-8) continue;
-
-        // Prefer transmitting force toward the front (+y)
-        let nx = dx / dist;
-        let ny = dy / dist;
-        if (Math.abs(ny) < 0.35) {
-          // nearly side-by-side: bias the more-forward coin further forward
-          const front = a.y >= b.y ? a : b;
-          const rear = a.y >= b.y ? b : a;
-          const overlap = min - dist;
-          front.y += overlap * 0.65 + 0.15;
-          rear.y -= overlap * 0.35;
-          front.vy += 8;
-          rear.vy += 4;
-          const side = front.x - rear.x || 0.01;
-          front.vx += Math.sign(side) * 6;
+        if (dist >= min) continue;
+        if (dist < 1e-8) {
+          a.y -= min * 0.5;
+          b.y += min * 0.5;
           continue;
         }
-        if (ny < 0) {
-          nx = -nx;
-          ny = -ny;
-        }
-        const overlap = (min - dist) * 0.5;
-        // Forward-biased separation: front coin takes more of the push
-        const aFront = a.y >= b.y;
-        const frontPush = overlap * 1.15;
-        const rearPush = overlap * 0.85;
-        if (aFront) {
-          a.x += nx * frontPush;
-          a.y += Math.max(ny, 0.15) * frontPush;
-          b.x -= nx * rearPush;
-          b.y -= ny * rearPush;
-          a.vy += 6;
-        } else {
-          b.x += nx * frontPush;
-          b.y += Math.max(ny, 0.15) * frontPush;
-          a.x -= nx * rearPush;
-          a.y -= ny * rearPush;
-          b.vy += 6;
-        }
 
-        const avn = a.vx * nx + a.vy * ny;
-        const bvn = b.vx * nx + b.vy * ny;
-        const impulse = ((avn - bvn) * (1 + COIN_REST)) / 2;
+        // Equal masses: split the penetration and the impulse evenly, so a
+        // pack only advances as far as something actually pushes it.
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const corr = (min - dist) * 0.5;
+        a.x -= nx * corr;
+        a.y -= ny * corr;
+        b.x += nx * corr;
+        b.y += ny * corr;
+
+        const rvn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+        if (rvn >= 0) continue;
+        const impulse = (-(1 + COIN_REST) * rvn) / 2;
         a.vx -= impulse * nx;
         a.vy -= impulse * ny;
         b.vx += impulse * nx;
         b.vy += impulse * ny;
-        // Never let the front coin get shoved backward hard
-        if (aFront && a.vy < 0) a.vy *= 0.25;
-        if (!aFront && b.vy < 0) b.vy *= 0.25;
-        if (Math.abs(impulse) > 25) events.push("clink");
+        if (impulse > 25) events.push("clink");
       }
     }
   }
@@ -520,6 +470,19 @@ export class CoinpushGame {
     this.shake = 0.4;
     events.push("score");
     this.message = `推出！＋${POINTS_PER_COIN} · 總分 ${this.score}`;
+  }
+
+  /**
+   * Fell into a side return: gone, no points.
+   * @param {Coin} c
+   * @param {string[]} events
+   */
+  loseCoin(c, events) {
+    if (!c.alive) return;
+    c.alive = false;
+    this.lost += 1;
+    events.push("lost");
+    this.message = `滑進邊溝 · 不計分 · 已漏 ${this.lost} 枚`;
   }
 }
 
